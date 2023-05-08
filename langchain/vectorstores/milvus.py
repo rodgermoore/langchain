@@ -35,6 +35,7 @@ class Milvus(VectorStore):
         index_params: Optional[dict] = None,
         search_params: Optional[dict] = None,
         drop_old: Optional[bool] = False,
+        reuse_store: Optional[bool] = False
     ):
         """Initialize wrapper around the milvus vector database.
 
@@ -90,6 +91,7 @@ class Milvus(VectorStore):
                 default of index.
             drop_old (Optional[bool]): Whether to drop the current collection. Defaults
                 to False.
+            reuse_store (Optional[bool]): Whether to use the VectorStore for search only (reuse the indexed data)
         """
         try:
             from pymilvus import Collection, utility
@@ -198,16 +200,33 @@ class Milvus(VectorStore):
             logger.error("Failed to create new connection using: %s", alias)
             raise e
 
+    def load_existing_collection(self, collection_name: str) -> None:
+        if self._client.has_collection(collection_name):
+            self._collection = self._client.collection(collection_name)
+            self._extract_fields()
+            self._create_search_params()
+        else:
+            raise ValueError(f"No collection named '{collection_name}' found.")
+        
     def _init(
-        self, embeddings: Optional[list] = None, metadatas: Optional[list[dict]] = None
+            self,
+            collection_name: str,
+            reuse_store: bool,
+            embeddings: Optional[list] = None,
+            metadatas: Optional[list[dict]] = None
     ) -> None:
-        if embeddings is not None:
-            self._create_collection(embeddings, metadatas)
-        self._extract_fields()
-        self._create_index()
-        self._create_search_params()
-        self._load()
-
+        if reuse_store is not True:
+            if embeddings is not None:
+                self._create_collection(embeddings, metadatas)
+            self._extract_fields()
+            self._create_index()
+            self._create_search_params()
+            self._load()
+        else:
+            self.load_existing_collection(self._collection_name)
+            self._create_search_params()
+            self._load()
+    
     def _create_collection(
         self, embeddings: list, metadatas: Optional[list[dict]] = None
     ) -> None:
@@ -772,7 +791,7 @@ class Milvus(VectorStore):
 
         Args:
             texts (List[str]): Text data.
-            embedding (Embeddings): Embedding function.
+            embedding Embeddings: Embedding function.
             metadatas (Optional[List[dict]]): Metadata for each text if it exists.
                 Defaults to None.
             collection_name (str, optional): Collection name to use. Defaults to
