@@ -123,11 +123,11 @@ class Milvus(VectorStore):
         self.reuse_store = reuse_store
 
         # In order for a collection to be compatible, pk needs to be auto'id and int
-        self._primary_field = "pk"
+        self._primary_field = "id"
         # In order for compatiblility, the text field will need to be called "text"
         self._text_field = "text"
         # In order for compatbility, the vector field needs to be called "vector"
-        self._vector_field = "vector"
+        self._vector_field = "embed"
         self.fields: list[str] = []
         # Create the connection to the server
         if connection_args is None:
@@ -577,7 +577,6 @@ class Milvus(VectorStore):
 
         # Determine result metadata fields.
         output_fields = self.fields[:]
-        print(output_fields)
         output_fields.remove(self._vector_field)
 
         res = self.similarity_search_with_score_by_vector(
@@ -624,7 +623,6 @@ class Milvus(VectorStore):
         output_fields = self.fields[:]
         output_fields.remove(self._vector_field)
         
-        print(embedding)
         # Perform the search.
         res = self.col.search(
             data=[embedding],
