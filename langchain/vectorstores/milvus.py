@@ -791,7 +791,7 @@ class Milvus(VectorStore):
 
         Args:
             texts (List[str]): Text data.
-            embedding Embeddings: Embedding function.
+            embedding (Embeddings): Embedding function.
             metadatas (Optional[List[dict]]): Metadata for each text if it exists.
                 Defaults to None.
             collection_name (str, optional): Collection name to use. Defaults to
