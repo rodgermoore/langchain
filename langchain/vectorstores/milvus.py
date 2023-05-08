@@ -120,6 +120,7 @@ class Milvus(VectorStore):
         self.index_params = index_params
         self.search_params = search_params
         self.consistency_level = consistency_level
+        self.reuse_store = reuse_store
 
         # In order for a collection to be compatible, pk needs to be auto'id and int
         self._primary_field = "pk"
@@ -134,7 +135,7 @@ class Milvus(VectorStore):
         self.alias = self._create_connection_alias(connection_args)
         self.col: Optional[Collection] = None
 
-        # Grab the existing colection if it exists
+        # Grab the existing collection if it exists
         if utility.has_collection(self.collection_name, using=self.alias):
             self.col = Collection(
                 self.collection_name,
@@ -146,7 +147,7 @@ class Milvus(VectorStore):
             self.col = None
 
         # Initialize the vector store
-        self._init()
+        self._init(collection_name, reuse_store)
 
     def _create_connection_alias(self, connection_args: dict) -> str:
         """Create the connection to the Milvus server."""
@@ -200,13 +201,21 @@ class Milvus(VectorStore):
             logger.error("Failed to create new connection using: %s", alias)
             raise e
 
-    def load_existing_collection(self, collection_name: str) -> None:
-        if self._client.has_collection(collection_name):
-            self._collection = self._client.collection(collection_name)
-            self._extract_fields()
-            self._create_search_params()
-        else:
-            raise ValueError(f"No collection named '{collection_name}' found.")
+    def _load_existing_collection(self, collection_name: str
+    ) -> None:
+        from pymilvus import MilvusException, Collection, utility
+        try: 
+            if utility.has_collection(self.collection_name, using=self.alias):
+                self.col = Collection(
+                    self.collection_name,
+                    using=self.alias,
+                )
+                return self.col
+            else:
+                print("Well, at least you tried to load a collection...")
+        except MilvusException as e:
+            logger.error("Failed to load collection using: %s", self.collection_name)
+            raise e
         
     def _init(
             self,
@@ -223,7 +232,9 @@ class Milvus(VectorStore):
             self._create_search_params()
             self._load()
         else:
-            self.load_existing_collection(self._collection_name)
+            self._load_existing_collection(self.collection_name)
+            self._extract_fields()
+            self._get_index()
             self._create_search_params()
             self._load()
     
@@ -566,6 +577,7 @@ class Milvus(VectorStore):
 
         # Determine result metadata fields.
         output_fields = self.fields[:]
+        print(output_fields)
         output_fields.remove(self._vector_field)
 
         res = self.similarity_search_with_score_by_vector(
@@ -611,7 +623,8 @@ class Milvus(VectorStore):
         # Determine result metadata fields.
         output_fields = self.fields[:]
         output_fields.remove(self._vector_field)
-
+        
+        print(embedding)
         # Perform the search.
         res = self.col.search(
             data=[embedding],
